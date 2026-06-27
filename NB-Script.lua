@@ -97,5 +97,42 @@ end)
 
 -- 复制种子的点击事件（在这里写上你原本的功能逻辑就行）
 Button.MouseButton1Click:Connect(function()
-	print("复制种子按钮被点击了！")
+	-- ==========================================
+-- 核心功能：方案 A (直接修改手持物品内部的数值)
+-- ==========================================
+Button.MouseButton1Click:Connect(function()
+	-- 获取玩家当前的角色模型
+	local character = Player.Character or Player.CharacterAdded:Wait()
+	
+	-- 查找角色当前拿在手里的工具（比如竹子种子）
+	local equippedTool = character:FindFirstChildOfClass("Tool")
+	
+	if equippedTool then
+		-- 很多游戏会把数量存成一个 IntValue，名字通常叫 Amount, Count 或 Value
+		local amountValue = equippedTool:FindFirstChild("Amount") 
+						 or equippedTool:FindFirstChild("Count") 
+						 or equippedTool:FindFirstChild("Value")
+						
+		if amountValue and (amountValue:IsA("IntValue") or amountValue:IsA("NumberValue")) then
+			-- 让数值 +1
+			amountValue.Value = amountValue.Value + 1
+			
+			-- 按钮文字提示效果（让你知道点成功了）
+			Button.Text = "复制成功! (+1)"
+			task.wait(0.5)
+			Button.Text = "复制种子"
+		else
+			-- 如果这个游戏不是用 Amount/Count/Value 来存数量的
+			Button.Text = "未找到数值文件"
+			task.wait(1)
+			Button.Text = "复制种子"
+		end
+	else
+		-- 如果你手上什么都没拿，提示一下
+		Button.Text = "请先拿在手上!"
+		task.wait(1)
+		Button.Text = "复制种子"
+	end
+end)
+
 end)
