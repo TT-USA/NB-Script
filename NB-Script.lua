@@ -95,41 +95,41 @@ task.spawn(function()
 	end
 end)
 
--- 核心功能：方案 A (直接修改手持物品内部的数值)
+-- ==========================================
+-- 核心功能：方案 A+ (暴力搜索手持物品内的所有数值并修改)
 -- ==========================================
 Button.MouseButton1Click:Connect(function()
-	-- 获取玩家当前的角色模型
 	local character = Player.Character or Player.CharacterAdded:Wait()
-	
-	-- 查找角色当前拿在手里的工具（比如竹子种子）
 	local equippedTool = character:FindFirstChildOfClass("Tool")
 	
 	if equippedTool then
-		-- 很多游戏会把数量存成一个 IntValue，名字通常叫 Amount, Count 或 Value
-		local amountValue = equippedTool:FindFirstChild("Amount") 
-						 or equippedTool:FindFirstChild("Count") 
-						 or equippedTool:FindFirstChild("Value")
-						
-		if amountValue and (amountValue:IsA("IntValue") or amountValue:IsA("NumberValue")) then
-			-- 让数值 +1
-			amountValue.Value = amountValue.Value + 1
-			
-			-- 按钮文字提示效果（让你知道点成功了）
-			Button.Text = "复制成功! (+1)"
-			task.wait(0.5)
+		local foundValue = false
+		
+		-- 自动翻找手持物品里面的所有隐藏文件和文件夹
+		for _, child in pairs(equippedTool:GetDescendants()) do
+			-- 只要是存数字的文件，不管叫什么名字，全部 +1
+			if child:IsA("IntValue") or child:IsA("NumberValue") then
+				child.Value = child.Value + 1
+				foundValue = true
+			end
+		end
+		
+		if foundValue then
+			Button.Text = "暴力修改成功!"
+			task.wait(1)
 			Button.Text = "复制种子"
 		else
-			-- 如果这个游戏不是用 Amount/Count/Value 来存数量的
-			Button.Text = "未找到数值文件"
+			-- 如果翻遍了都没有，说明数量根本没存在工具里
+			Button.Text = "物品内无数字!"
 			task.wait(1)
 			Button.Text = "复制种子"
 		end
 	else
-		-- 如果你手上什么都没拿，提示一下
 		Button.Text = "请先拿在手上!"
 		task.wait(1)
 		Button.Text = "复制种子"
 	end
 end)
+
 
 
