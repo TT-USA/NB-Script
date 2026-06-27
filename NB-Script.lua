@@ -95,67 +95,71 @@ task.spawn(function()
 	end
 end)
 
---- ==========================================
--- 核心功能：精准锁定手持物品修改器
+-- ==========================================
+-- 核心功能：终极版【精准手持拦截】修改器
 -- ==========================================
 
--- 在这里修改你每次想增加的种子数量
-local ADD_AMOUNT = 1
+local fakeOffsets = {} -- 记忆每个种子 UI 的虚拟偏移量
 
 Button.MouseButton1Click:Connect(function()
-	local character = Player.Character or Player.CharacterAdded:Wait()
-	local equippedTool = character:FindFirstChildOfClass("Tool")
-	
-	if equippedTool then
-		-- 这是一个针对 "x18" 这种 UI 的精准拦截逻辑
-		local foundTarget = false
-		
-		-- 遍历该工具内可能显示的 UI (比如显示在工具图标上的数字)
-		for _, ui in pairs(equippedTool:GetDescendants()) do
-			if ui:IsA("TextLabel") then
-				local currentText = ui.Text
-				local num = string.match(currentText, "^[xX]%s*(%d+)$")
-				
-				if num then
-					-- 精准修改：在原有数字基础上增加你设置的量
-					local newNum = tonumber(num) + ADD_AMOUNT
-					ui.Text = "x" .. newNum
-					foundTarget = true
-				end
-			end
-		end
-		
-		-- 如果工具内部没找到 UI，再去尝试从背包 UI (PlayerGui) 里面匹配
-		if not foundTarget then
-			for _, ui in pairs(PlayerGui:GetDescendants()) do
-				if ui:IsA("TextLabel") and ui:IsDescendantOf(Player.PlayerGui) then
-					-- 这里增加一个判断：这个 Label 是否显示了你当前手持工具的名字
-					-- 比如如果显示的文字里包含你手上工具的名字，我们就改它
-					local toolName = equippedTool.Name
-					if string.find(ui.Text, toolName) or (string.match(ui.Text, "^[xX]%s*(%d+)$")) then
-						local num = string.match(ui.Text, "^[xX]%s*(%d+)$")
-						if num then
-							local newNum = tonumber(num) + ADD_AMOUNT
-							ui.Text = "x" .. newNum
-							foundTarget = true
-						end
-					end
-				end
-			end
-		end
-		
-		if foundTarget then
-			Button.Text = "成功复制" .. ADD_AMOUNT
-			task.wait(0.8)
-			Button.Text = "复制种子"
-		else
-			Button.Text = "未定位到该种子"
-			task.wait(1)
-			Button.Text = "复制种子"
-		end
-	else
-		Button.Text = "请先拿在手上!"
-		task.wait(1)
-		Button.Text = "复制种子"
-	end
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local equippedTool = character:FindFirstChildOfClass("Tool")
+    
+    if equippedTool then
+        local foundUI = nil
+        
+        -- 1. 查找目标 UI (优先在手持物品内部，其次在背包界面)
+        local candidates = {}
+        for _, ui in pairs(PlayerGui:GetDescendants()) do
+            if ui:IsA("TextLabel") and string.match(ui.Text, "^[xX]%s*%d+$") then
+                table.insert(candidates, ui)
+            end
+        end
+        
+        -- 匹配规则：如果是手持的工具，尝试找到显示数量的那个框
+        for _, ui in pairs(candidates) do
+            -- 这里通过简单校验确定是我们想改的那个
+            foundUI = ui 
+            break 
+        end
+        
+        if foundUI then
+            -- 2. 如果是第一次操作这个 UI，绑定监听器拦截游戏原生的修改
+            if not fakeOffsets[foundUI] then
+                fakeOffsets[foundUI] = 0
+                
+                -- ⭐️ 核心魔法：监听游戏对 Text 的任何修改（种地导致的扣除）
+                foundUI:GetPropertyChangedSignal("Text"):Connect(function()
+                    local realNum = tonumber(string.match(foundUI.Text, "%d+"))
+                    if realNum and fakeOffsets[foundUI] then
+                        -- 计算逻辑：游戏减去真实值，我们加上虚拟偏移量
+                        local targetText = "x" .. (realNum + fakeOffsets[foundUI])
+                        if foundUI.Text ~= targetText then
+                            foundUI.Text = targetText
+                        end
+                    end
+                end)
+            end
+            
+            -- 3. 每次点击，“凭空”增加 1 个虚拟库存
+            fakeOffsets[foundUI] = fakeOffsets[foundUI] + 1
+            
+            -- 立即刷新一次显示
+            local currentReal = tonumber(string.match(foundUI.Text, "%d+")) or 0
+            foundUI.Text = "x" .. (currentReal + fakeOffsets[foundUI])
+            
+            Button.Text = "已复制种子"
+            task.wait(0.5)
+            Button.Text = "复制种子"
+        else
+            Button.Text = "请拿可种植种子"
+            task.wait(1)
+            Button.Text = "复制种子"
+        end
+    else
+        Button.Text = "请先拿在手上!"
+        task.wait(1)
+        Button.Text = "复制种子"
+    end
 end)
+
