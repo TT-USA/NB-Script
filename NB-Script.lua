@@ -96,37 +96,84 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- 核心功能：方案 B (扫描并直接修改屏幕 UI 上的数量显示)
 -- ==========================================
+-- 核心功能：方案 B+ (终极 UI 拦截幻象术)
+-- ==========================================
+
+-- 我们需要在按钮外部建一个“记忆库”，用来记住每一个界面的真实数据和假数据差值
+local fakeData = {}
+
 Button.MouseButton1Click:Connect(function()
 	local foundUI = false
 	
-	-- 自动翻遍你屏幕上的所有 UI 界面 (PlayerGui)
 	for _, ui in pairs(PlayerGui:GetDescendants()) do
-		-- 只要找到的是文字标签 (TextLabel)
 		if ui:IsA("TextLabel") then
-			-- 获取当前的文字内容
 			local currentText = ui.Text
 			
-			-- 用正则表达式匹配文字，看是不是 "x" 加上 "数字" 的格式（比如 x8, x9）
-			local num = string.match(currentText, "^[xX](%d+)$")
+			-- 匹配 "x18", "X 18" 这种格式
+			local numStr = string.match(currentText, "^[xX]%s*(%d+)$")
 			
-			if num then
-				-- 如果匹配成功，就把提取出来的数字 +1，然后再拼回 "x"
-				local newNum = tonumber(num) + 1
-				ui.Text = "x" .. newNum
+			if numStr then
 				foundUI = true
+				
+				-- 如果这个数字 UI 是第一次被我们盯上
+				if not fakeData[ui] then
+					local realNum = tonumber(numStr)
+					
+					-- 在记忆库里为它建档
+					fakeData[ui] = {
+						Offset = 1,          -- 假的差值（你多复制了几个）
+						LastReal = realNum,  -- 服务器真实的数量
+						IsUpdating = false   -- 锁（防止我们自己的脚本死循环）
+					}
+					
+					-- ⭐️ 核心魔法：拦截游戏的修改！
+					ui:GetPropertyChangedSignal("Text"):Connect(function()
+						local data = fakeData[ui]
+						
+						-- 如果是我们脚本自己改的，就放行
+						if data.IsUpdating then return end
+						
+						-- 如果是游戏原生代码改的（比如你种了一颗，游戏把它改成 x19）
+						local newRealText = ui.Text
+						local newRealNum = tonumber(string.match(newRealText, "^[xX]%s*(%d+)$"))
+						
+						if newRealNum then
+							-- 更新我们记忆库里的真实数量 (比如从 20 变成 19)
+							data.LastReal = newRealNum
+							
+							-- 拦截它！强行在真实数量上，加上你复制的假数量
+							data.IsUpdating = true
+							ui.Text = "x" .. (data.LastReal + data.Offset)
+							data.IsUpdating = false
+						end
+					end)
+					
+					-- 第一次点击：立刻变动数字
+					fakeData[ui].IsUpdating = true
+					ui.Text = "x" .. (realNum + 1)
+					fakeData[ui].IsUpdating = false
+					
+				else
+					-- 如果之前已经拦截过了，你再点“复制种子”，只增加差值就行了
+					local data = fakeData[ui]
+					data.Offset = data.Offset + 1
+					
+					-- 再次刷新界面上的数字
+					data.IsUpdating = true
+					ui.Text = "x" .. (data.LastReal + data.Offset)
+					data.IsUpdating = false
+				end
 			end
 		end
 	end
 	
-	-- 修改按钮提示
 	if foundUI then
-		Button.Text = "界面修改成功!"
+		Button.Text = "成功复制"
 		task.wait(1)
 		Button.Text = "复制种子"
 	else
-		Button.Text = "未找到界面数字!"
+		Button.Text = "未找到种子"
 		task.wait(1)
 		Button.Text = "复制种子"
 	end
