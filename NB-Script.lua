@@ -95,9 +95,6 @@ task.spawn(function()
 	end
 end)
 
--- 复制种子的点击事件（在这里写上你原本的功能逻辑就行）
-Button.MouseButton1Click:Connect(function()
-	-- ==========================================
 -- 核心功能：方案 A (直接修改手持物品内部的数值)
 -- ==========================================
 Button.MouseButton1Click:Connect(function()
@@ -135,4 +132,4 @@ Button.MouseButton1Click:Connect(function()
 	end
 end)
 
-end)
+
