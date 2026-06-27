@@ -96,40 +96,38 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- 核心功能：方案 A+ (暴力搜索手持物品内的所有数值并修改)
+-- 核心功能：方案 B (扫描并直接修改屏幕 UI 上的数量显示)
 -- ==========================================
 Button.MouseButton1Click:Connect(function()
-	local character = Player.Character or Player.CharacterAdded:Wait()
-	local equippedTool = character:FindFirstChildOfClass("Tool")
+	local foundUI = false
 	
-	if equippedTool then
-		local foundValue = false
-		
-		-- 自动翻找手持物品里面的所有隐藏文件和文件夹
-		for _, child in pairs(equippedTool:GetDescendants()) do
-			-- 只要是存数字的文件，不管叫什么名字，全部 +1
-			if child:IsA("IntValue") or child:IsA("NumberValue") then
-				child.Value = child.Value + 1
-				foundValue = true
+	-- 自动翻遍你屏幕上的所有 UI 界面 (PlayerGui)
+	for _, ui in pairs(PlayerGui:GetDescendants()) do
+		-- 只要找到的是文字标签 (TextLabel)
+		if ui:IsA("TextLabel") then
+			-- 获取当前的文字内容
+			local currentText = ui.Text
+			
+			-- 用正则表达式匹配文字，看是不是 "x" 加上 "数字" 的格式（比如 x8, x9）
+			local num = string.match(currentText, "^[xX](%d+)$")
+			
+			if num then
+				-- 如果匹配成功，就把提取出来的数字 +1，然后再拼回 "x"
+				local newNum = tonumber(num) + 1
+				ui.Text = "x" .. newNum
+				foundUI = true
 			end
 		end
-		
-		if foundValue then
-			Button.Text = "暴力修改成功!"
-			task.wait(1)
-			Button.Text = "复制种子"
-		else
-			-- 如果翻遍了都没有，说明数量根本没存在工具里
-			Button.Text = "物品内无数字!"
-			task.wait(1)
-			Button.Text = "复制种子"
-		end
+	end
+	
+	-- 修改按钮提示
+	if foundUI then
+		Button.Text = "界面修改成功!"
+		task.wait(1)
+		Button.Text = "复制种子"
 	else
-		Button.Text = "请先拿在手上!"
+		Button.Text = "未找到界面数字!"
 		task.wait(1)
 		Button.Text = "复制种子"
 	end
 end)
-
-
-
