@@ -96,73 +96,67 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- 核心功能：最终优化版【精准手持拦截】
+-- 核心功能：精准锁定手持物品修改器
 -- ==========================================
 
-local fakeOffsets = {} -- 记忆每个种子 UI 的虚拟偏移量
-local isInternalUpdating = false -- 状态锁，防止递归循环
+-- 在这里修改你每次想增加的种子数量
+local ADD_AMOUNT = 1
 
 Button.MouseButton1Click:Connect(function()
-    local character = Player.Character or Player.CharacterAdded:Wait()
-    local equippedTool = character:FindFirstChildOfClass("Tool")
-    
-    if equippedTool then
-        local foundUI = nil
-        
-        -- 精准锁定：优先找包含当前工具名且符合 x数字 格式的 Label
-        for _, ui in pairs(PlayerGui:GetDescendants()) do
-            if ui:IsA("TextLabel") and string.match(ui.Text, "^[xX]%s*%d+$") then
-                -- 简单的校验：UI 必须是可见的，且不能是那个“NB-Script”自己的 Label
-                if ui.Visible and ui:FindFirstAncestor(equippedTool.Name) or ui:IsDescendantOf(PlayerGui) then
-                    foundUI = ui 
-                    break 
-                end
-            end
-        end
-        
-        if foundUI then
-            -- 绑定监听器
-            if not fakeOffsets[foundUI] then
-                fakeOffsets[foundUI] = 0
-                
-                foundUI:GetPropertyChangedSignal("Text"):Connect(function()
-                    if isInternalUpdating then return end -- 锁：如果是我们自己改的，就跳过
-                    
-                    local currentText = foundUI.Text
-                    local realNum = tonumber(string.match(currentText, "%d+"))
-                    
-                    if realNum and fakeOffsets[foundUI] then
-                        -- 如果当前显示的值和我们预期的值不一样，说明游戏改了数字
-                        local expectedText = "x" .. (realNum + fakeOffsets[foundUI])
-                        if currentText ~= expectedText then
-                            isInternalUpdating = true
-                            foundUI.Text = expectedText
-                            isInternalUpdating = false
-                        end
-                    end
-                end)
-            end
-            
-            -- 增加虚拟量
-            fakeOffsets[foundUI] = fakeOffsets[foundUI] + 1
-            
-            -- 立即刷新一次
-            isInternalUpdating = true
-            local currentReal = tonumber(string.match(foundUI.Text, "%d+")) or 0
-            foundUI.Text = "x" .. (currentReal + fakeOffsets[foundUI])
-            isInternalUpdating = false
-            
-            Button.Text = "已复制 +" .. fakeOffsets[foundUI]
-            task.wait(0.5)
-            Button.Text = "复制种子"
-        else
-            Button.Text = "未匹配到种子UI"
-            task.wait(1)
-            Button.Text = "复制种子"
-        end
-    else
-        Button.Text = "请先拿在手上!"
-        task.wait(1)
-        Button.Text = "复制种子"
-    end
+	local character = Player.Character or Player.CharacterAdded:Wait()
+	local equippedTool = character:FindFirstChildOfClass("Tool")
+	
+	if equippedTool then
+		-- 这是一个针对 "x18" 这种 UI 的精准拦截逻辑
+		local foundTarget = false
+		
+		-- 遍历该工具内可能显示的 UI (比如显示在工具图标上的数字)
+		for _, ui in pairs(equippedTool:GetDescendants()) do
+			if ui:IsA("TextLabel") then
+				local currentText = ui.Text
+				local num = string.match(currentText, "^[xX]%s*(%d+)$")
+				
+				if num then
+					-- 精准修改：在原有数字基础上增加你设置的量
+					local newNum = tonumber(num) + ADD_AMOUNT
+					ui.Text = "x" .. newNum
+					foundTarget = true
+				end
+			end
+		end
+		
+		-- 如果工具内部没找到 UI，再去尝试从背包 UI (PlayerGui) 里面匹配
+		if not foundTarget then
+			for _, ui in pairs(PlayerGui:GetDescendants()) do
+				if ui:IsA("TextLabel") and ui:IsDescendantOf(Player.PlayerGui) then
+					-- 这里增加一个判断：这个 Label 是否显示了你当前手持工具的名字
+					-- 比如如果显示的文字里包含你手上工具的名字，我们就改它
+					local toolName = equippedTool.Name
+					if string.find(ui.Text, toolName) or (string.match(ui.Text, "^[xX]%s*(%d+)$")) then
+						local num = string.match(ui.Text, "^[xX]%s*(%d+)$")
+						if num then
+							local newNum = tonumber(num) + ADD_AMOUNT
+							ui.Text = "x" .. newNum
+							foundTarget = true
+						end
+					end
+				end
+			end
+		end
+		
+		if foundTarget then
+			Button.Text = "成功增加" .. ADD_AMOUNT
+			task.wait(0.8)
+			Button.Text = "复制种子"
+		else
+			Button.Text = "未定位到该种子"
+			task.wait(1)
+			Button.Text = "复制种子"
+		end
+	else
+		Button.Text = "请先拿在手上!"
+		task.wait(1)
+		Button.Text = "复制种子"
+	end
 end)
+
