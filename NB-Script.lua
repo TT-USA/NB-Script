@@ -96,10 +96,11 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- 核心功能：终极版【精准手持拦截】修改器
+-- 核心功能：最终优化版【精准手持拦截】
 -- ==========================================
 
 local fakeOffsets = {} -- 记忆每个种子 UI 的虚拟偏移量
+local isInternalUpdating = false -- 状态锁，防止递归循环
 
 Button.MouseButton1Click:Connect(function()
     local character = Player.Character or Player.CharacterAdded:Wait()
@@ -108,51 +109,54 @@ Button.MouseButton1Click:Connect(function()
     if equippedTool then
         local foundUI = nil
         
-        -- 1. 查找目标 UI (优先在手持物品内部，其次在背包界面)
-        local candidates = {}
+        -- 精准锁定：优先找包含当前工具名且符合 x数字 格式的 Label
         for _, ui in pairs(PlayerGui:GetDescendants()) do
             if ui:IsA("TextLabel") and string.match(ui.Text, "^[xX]%s*%d+$") then
-                table.insert(candidates, ui)
+                -- 简单的校验：UI 必须是可见的，且不能是那个“NB-Script”自己的 Label
+                if ui.Visible and ui:FindFirstAncestor(equippedTool.Name) or ui:IsDescendantOf(PlayerGui) then
+                    foundUI = ui 
+                    break 
+                end
             end
         end
         
-        -- 匹配规则：如果是手持的工具，尝试找到显示数量的那个框
-        for _, ui in pairs(candidates) do
-            -- 这里通过简单校验确定是我们想改的那个
-            foundUI = ui 
-            break 
-        end
-        
         if foundUI then
-            -- 2. 如果是第一次操作这个 UI，绑定监听器拦截游戏原生的修改
+            -- 绑定监听器
             if not fakeOffsets[foundUI] then
                 fakeOffsets[foundUI] = 0
                 
-                -- ⭐️ 核心魔法：监听游戏对 Text 的任何修改（种地导致的扣除）
                 foundUI:GetPropertyChangedSignal("Text"):Connect(function()
-                    local realNum = tonumber(string.match(foundUI.Text, "%d+"))
+                    if isInternalUpdating then return end -- 锁：如果是我们自己改的，就跳过
+                    
+                    local currentText = foundUI.Text
+                    local realNum = tonumber(string.match(currentText, "%d+"))
+                    
                     if realNum and fakeOffsets[foundUI] then
-                        -- 计算逻辑：游戏减去真实值，我们加上虚拟偏移量
-                        local targetText = "x" .. (realNum + fakeOffsets[foundUI])
-                        if foundUI.Text ~= targetText then
-                            foundUI.Text = targetText
+                        -- 如果当前显示的值和我们预期的值不一样，说明游戏改了数字
+                        local expectedText = "x" .. (realNum + fakeOffsets[foundUI])
+                        if currentText ~= expectedText then
+                            isInternalUpdating = true
+                            foundUI.Text = expectedText
+                            isInternalUpdating = false
                         end
                     end
                 end)
             end
             
-            -- 3. 每次点击，“凭空”增加 1 个虚拟库存
+            -- 增加虚拟量
             fakeOffsets[foundUI] = fakeOffsets[foundUI] + 1
             
-            -- 立即刷新一次显示
+            -- 立即刷新一次
+            isInternalUpdating = true
             local currentReal = tonumber(string.match(foundUI.Text, "%d+")) or 0
             foundUI.Text = "x" .. (currentReal + fakeOffsets[foundUI])
+            isInternalUpdating = false
             
-            Button.Text = "已复制种子"
+            Button.Text = "已复制 +" .. fakeOffsets[foundUI]
             task.wait(0.5)
             Button.Text = "复制种子"
         else
-            Button.Text = "请拿可种植种子"
+            Button.Text = "未匹配到种子UI"
             task.wait(1)
             Button.Text = "复制种子"
         end
@@ -162,4 +166,3 @@ Button.MouseButton1Click:Connect(function()
         Button.Text = "复制种子"
     end
 end)
-
