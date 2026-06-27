@@ -95,85 +95,66 @@ task.spawn(function()
 	end
 end)
 
--- ==========================================
--- ==========================================
--- 核心功能：方案 B+ (终极 UI 拦截幻象术)
+--- ==========================================
+-- 核心功能：精准锁定手持物品修改器
 -- ==========================================
 
--- 我们需要在按钮外部建一个“记忆库”，用来记住每一个界面的真实数据和假数据差值
-local fakeData = {}
+-- 在这里修改你每次想增加的种子数量
+local ADD_AMOUNT = 1
 
 Button.MouseButton1Click:Connect(function()
-	local foundUI = false
+	local character = Player.Character or Player.CharacterAdded:Wait()
+	local equippedTool = character:FindFirstChildOfClass("Tool")
 	
-	for _, ui in pairs(PlayerGui:GetDescendants()) do
-		if ui:IsA("TextLabel") then
-			local currentText = ui.Text
-			
-			-- 匹配 "x18", "X 18" 这种格式
-			local numStr = string.match(currentText, "^[xX]%s*(%d+)$")
-			
-			if numStr then
-				foundUI = true
+	if equippedTool then
+		-- 这是一个针对 "x18" 这种 UI 的精准拦截逻辑
+		local foundTarget = false
+		
+		-- 遍历该工具内可能显示的 UI (比如显示在工具图标上的数字)
+		for _, ui in pairs(equippedTool:GetDescendants()) do
+			if ui:IsA("TextLabel") then
+				local currentText = ui.Text
+				local num = string.match(currentText, "^[xX]%s*(%d+)$")
 				
-				-- 如果这个数字 UI 是第一次被我们盯上
-				if not fakeData[ui] then
-					local realNum = tonumber(numStr)
-					
-					-- 在记忆库里为它建档
-					fakeData[ui] = {
-						Offset = 1,          -- 假的差值（你多复制了几个）
-						LastReal = realNum,  -- 服务器真实的数量
-						IsUpdating = false   -- 锁（防止我们自己的脚本死循环）
-					}
-					
-					-- ⭐️ 核心魔法：拦截游戏的修改！
-					ui:GetPropertyChangedSignal("Text"):Connect(function()
-						local data = fakeData[ui]
-						
-						-- 如果是我们脚本自己改的，就放行
-						if data.IsUpdating then return end
-						
-						-- 如果是游戏原生代码改的（比如你种了一颗，游戏把它改成 x19）
-						local newRealText = ui.Text
-						local newRealNum = tonumber(string.match(newRealText, "^[xX]%s*(%d+)$"))
-						
-						if newRealNum then
-							-- 更新我们记忆库里的真实数量 (比如从 20 变成 19)
-							data.LastReal = newRealNum
-							
-							-- 拦截它！强行在真实数量上，加上你复制的假数量
-							data.IsUpdating = true
-							ui.Text = "x" .. (data.LastReal + data.Offset)
-							data.IsUpdating = false
-						end
-					end)
-					
-					-- 第一次点击：立刻变动数字
-					fakeData[ui].IsUpdating = true
-					ui.Text = "x" .. (realNum + 1)
-					fakeData[ui].IsUpdating = false
-					
-				else
-					-- 如果之前已经拦截过了，你再点“复制种子”，只增加差值就行了
-					local data = fakeData[ui]
-					data.Offset = data.Offset + 1
-					
-					-- 再次刷新界面上的数字
-					data.IsUpdating = true
-					ui.Text = "x" .. (data.LastReal + data.Offset)
-					data.IsUpdating = false
+				if num then
+					-- 精准修改：在原有数字基础上增加你设置的量
+					local newNum = tonumber(num) + ADD_AMOUNT
+					ui.Text = "x" .. newNum
+					foundTarget = true
 				end
 			end
 		end
-	end
-	
-	if foundUI then
-		Button.Text = "成功复制"
-		task.wait(1)
-		Button.Text = "复制种子"
+		
+		-- 如果工具内部没找到 UI，再去尝试从背包 UI (PlayerGui) 里面匹配
+		if not foundTarget then
+			for _, ui in pairs(PlayerGui:GetDescendants()) do
+				if ui:IsA("TextLabel") and ui:IsDescendantOf(Player.PlayerGui) then
+					-- 这里增加一个判断：这个 Label 是否显示了你当前手持工具的名字
+					-- 比如如果显示的文字里包含你手上工具的名字，我们就改它
+					local toolName = equippedTool.Name
+					if string.find(ui.Text, toolName) or (string.match(ui.Text, "^[xX]%s*(%d+)$")) then
+						local num = string.match(ui.Text, "^[xX]%s*(%d+)$")
+						if num then
+							local newNum = tonumber(num) + ADD_AMOUNT
+							ui.Text = "x" .. newNum
+							foundTarget = true
+						end
+					end
+				end
+			end
+		end
+		
+		if foundTarget then
+			Button.Text = "成功复制" .. ADD_AMOUNT
+			task.wait(0.8)
+			Button.Text = "复制种子"
+		else
+			Button.Text = "未定位到该种子"
+			task.wait(1)
+			Button.Text = "复制种子"
+		end
 	else
-		Button.Text = "未找到种子"
+		Button.Text = "请先拿在手上!"
 		task.wait(1)
 		Button.Text = "复制种子"
 	end
