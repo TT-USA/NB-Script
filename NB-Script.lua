@@ -874,7 +874,7 @@ local function ShowKeyUI()
         Position = UDim2.new(0, RX, 0, 185),
         Size = UDim2.new(0, RW, 0, 13),
         Font = Enum.Font.GothamBold,
-        Text = "来吃MC: "FREE 鸡翅膀 在KL",
+        Text = "来吃MC: FREE 鸡翅膀 在KL",
         TextColor3 = Color3.fromRGB(175, 155, 210),
         TextSize = 9,
         TextXAlignment = Enum.TextXAlignment.Center,
